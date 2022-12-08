@@ -25,7 +25,7 @@ int check_archive(int tar_fd) {
     printf("  Buffer = [");
     for (int i = 0; i < 512 - 1; i += 1) {
       
-      printf("%c,", buffer[i]);
+      printf("%d,", buffer[i]);
     }
 
     printf("%d]\n", buffer[512]);
@@ -150,7 +150,8 @@ int Read_posix_header(char* buffer, struct posix_header* to_fill){
     memcpy(&(to_fill->magic),buffer+257,6);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksm 
-    if (strcmp(TMAGIC,to_fill->magic)!=0) return -1;
+    if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;
+    printf("ICIC %d  %d \n",to_fill->version[0],to_fill->version[1]);   
     if(strcmp(TVERSION,to_fill->version)!=0) return -2;
     if((uint64_t) (to_fill->chksum) != checksum(buffer))return -3;
     return 1;
@@ -169,7 +170,7 @@ uint64_t checksum(char * buffer){
 
     uint64_t mysum =0;
     for(int i=0;i<512;i++){
-            mysum += TAR_INT(buffer[i]);
+            mysum += TAR_INT(buffer+i);
     }
     return mysum;
 }
