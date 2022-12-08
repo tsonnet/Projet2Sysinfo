@@ -1,6 +1,6 @@
 CFLAGS=-g -Wall -Werror
 
-all: tests lib_tar.o
+all: tests lib_tar.o  #include <stdlib.h>
 
 lib_tar.o: lib_tar.c lib_tar.h
 

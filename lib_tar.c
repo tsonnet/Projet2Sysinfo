@@ -1,5 +1,7 @@
 #include "lib_tar.h"
 
+// ./tests test.tar 
+
 /**
  * Checks whether the archive is valid.
  *
@@ -16,11 +18,35 @@
  *         -3 if the archive contains a header with an invalid checksum value
  */
 int check_archive(int tar_fd) {
-    return 0;
+    int counter =0;
+    struct posix_header* curr = malloc(sizeof(struct posix_header));
+    char * buffer = calloc(512,sizeof(char));
+    int re =read(tar_fd,buffer,512);
+    printf("  Buffer = [");
+    for (int i = 0; i < 512 - 1; i += 1) {
+      
+      printf("%c,", buffer[i]);
+    }
+
+    printf("%d]\n", buffer[512]);
+    printf("Checksum : %c,%c,%c,%c\n",buffer[149],buffer[150],buffer[151],buffer[152]);
+    printf("Number of bytes read %d\n", re);
+    if(re ==0) return 0;
+    while(is_end(buffer)){
+        int res = Read_posix_header(buffer,curr);
+        if(res!=0)return res;
+        counter+=1;
+        int re =read(tar_fd,buffer,512);
+        if(re==0) break;
+        printf("counter %d\n",counter);
+    }
+    free(curr);
+    free(buffer);
+    return counter;
 }
 
 /**
- * Checks whether an entry exists in the archive.
+ * Checks whether an entry exists in the archive. Thibaut
  *
  * @param tar_fd A file descriptor pointing to the start of a valid tar archive file.
  * @param path A path to an entry in the archive.
@@ -33,7 +59,7 @@ int exists(int tar_fd, char *path) {
 }
 
 /**
- * Checks whether an entry exists in the archive and is a directory.
+ * Checks whether an entry exists in the archive and is a directory. Thibaut
  *
  * @param tar_fd A file descriptor pointing to the start of a valid tar archive file.
  * @param path A path to an entry in the archive.
@@ -46,7 +72,7 @@ int is_dir(int tar_fd, char *path) {
 }
 
 /**
- * Checks whether an entry exists in the archive and is a file.
+ * Checks whether an entry exists in the archive and is a file. Nico
  *
  * @param tar_fd A file descriptor pointing to the start of a valid tar archive file.
  * @param path A path to an entry in the archive.
@@ -59,7 +85,7 @@ int is_file(int tar_fd, char *path) {
 }
 
 /**
- * Checks whether an entry exists in the archive and is a symlink.
+ * Checks whether an entry exists in the archive and is a symlink. Nico
  *
  * @param tar_fd A file descriptor pointing to the start of a valid tar archive file.
  * @param path A path to an entry in the archive.
@@ -72,7 +98,7 @@ int is_symlink(int tar_fd, char *path) {
 
 
 /**
- * Lists the entries at a given path in the archive.
+ * Lists the entries at a given path in the archive. Nico
  * list() does not recurse into the directories listed at the given path.
  *
  * Example:
@@ -98,7 +124,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 }
 
 /**
- * Reads a file at a given path in the archive.
+ * Reads a file at a given path in the archive. Thibaut
  *
  * @param tar_fd A file descriptor pointing to the start of a valid tar archive file.
  * @param path A path to an entry in the archive to read from.  If the entry is a symlink, it must be resolved to its linked-to entry.
@@ -117,4 +143,33 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
     return 0;
+}
+
+int Read_posix_header(char* buffer, struct posix_header* to_fill){
+    memcpy(&(to_fill->name),buffer,100); //name
+    memcpy(&(to_fill->magic),buffer+257,6);//value
+    memcpy(&(to_fill->version),buffer+263,2); //Version 
+    memcpy(&(to_fill->chksum),buffer+148,8); //chcksm 
+    if (strcmp(TMAGIC,to_fill->magic)!=0) return -1;
+    if(strcmp(TVERSION,to_fill->version)!=0) return -2;
+    if((uint64_t) (to_fill->chksum) != checksum(buffer))return -3;
+    return 1;
+}
+
+int is_end(char* buffer){
+    for(int i=0; i<512;i++){
+        if(buffer[i] != 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint64_t checksum(char * buffer){ 
+
+    uint64_t mysum =0;
+    for(int i=0;i<512;i++){
+            mysum += TAR_INT(buffer[i]);
+    }
+    return mysum;
 }

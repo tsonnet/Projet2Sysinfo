@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <unistd.h>
+ #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct posix_header
 {                              /* byte offset */
@@ -147,4 +150,8 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries);
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len);
 
+int Read_posix_header(char* buffer, struct posix_header* to_fill);
+
+int is_end(char* buffer);
+uint64_t checksum(char * buffer);
 #endif
