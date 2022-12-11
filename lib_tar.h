@@ -150,8 +150,14 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries);
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len);
 
-int Read_posix_header(char* buffer, struct posix_header* to_fill);
+int Read_posix_header(char* buffer, tar_header_t* to_fill,char* name);
 
 int is_end(char* buffer);
+
 uint64_t checksum(char * buffer);
+
+int checkChecksum(char * buffer,char* checksum);
+
+static uint64_t decodeTarOctal(char* data);
+
 #endif

@@ -1,4 +1,5 @@
 #include "lib_tar.h"
+#include "print_function.h"
 
 // ./tests test.tar 
 
@@ -17,30 +18,46 @@
  *         -2 if the archive contains a header with an invalid version value,
  *         -3 if the archive contains a header with an invalid checksum value
  */
-int check_archive(int tar_fd) {
-    int counter =0;
-    struct posix_header* curr = malloc(sizeof(struct posix_header));
-    char * buffer = calloc(512,sizeof(char));
-    int re =read(tar_fd,buffer,512);
-    printf("  Buffer = [");
-    for (int i = 0; i < 512 - 1; i += 1) {
-      
-      printf("%d,", buffer[i]);
-    }
 
-    printf("%d]\n", buffer[512]);
-    printf("Checksum : %c,%c,%c,%c\n",buffer[149],buffer[150],buffer[151],buffer[152]);
+#define ASCII_TO_NUMBER(num) ((num)-48) //Converts an ascii digit to the corresponding number
+
+char* buffer;
+tar_header_t* structure;
+int counter;
+
+int check_archive(int tar_fd) {
+
+    ///////////////// Initialisation des variables ////////////////////
+    counter =0;
+    structure = malloc(sizeof(tar_header_t));
+    buffer = calloc(512,sizeof(char));
+    //////////////////////////////////////////////////////////////////
+
+    int re =read(tar_fd,buffer,512);
+
+    ///////////////// Test Print /////////////////////////////////////
+    print_list_entier(buffer, 512, "Buffer");
+    print_list_chaine(buffer, 512, "Buffer");
+    print_chaine(buffer+148,8,"Checksum");
     printf("Number of bytes read %d\n", re);
+    ///////////////////////////////////////////////////////////////////
+
     if(re ==0) return 0;
-    while(is_end(buffer)){
-        int res = Read_posix_header(buffer,curr);
+    char name[32];
+    memcpy(name,buffer+263,32); //on enregistre le nom de l'utilisateur, qui sera toujours le meme, sauf pour les données du fichier
+
+    while(1){
+
+        int res = Read_posix_header(buffer,structure,name);
+        if(res == 4)break;
         if(res!=0)return res;
-        counter+=1;
-        int re =read(tar_fd,buffer,512);
+        int re = read(tar_fd,buffer,512);
         if(re==0) break;
+        counter+=1;
         printf("counter %d\n",counter);
     }
-    free(curr);
+
+    free(structure);
     free(buffer);
     return counter;
 }
@@ -145,16 +162,21 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     return 0;
 }
 
-int Read_posix_header(char* buffer, struct posix_header* to_fill){
+int Read_posix_header(char* buffer, tar_header_t* to_fill,char * uname){
+
     memcpy(&(to_fill->name),buffer,100); //name
-    memcpy(&(to_fill->magic),buffer+257,6);//value
+    memcpy(&(to_fill->magic),buffer+257,5);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
-    memcpy(&(to_fill->chksum),buffer+148,8); //chcksm 
-    if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;
-    printf("ICIC %d  %d \n",to_fill->version[0],to_fill->version[1]);   
-    if(strcmp(TVERSION,to_fill->version)!=0) return -2;
-    if((uint64_t) (to_fill->chksum) != checksum(buffer))return -3;
-    return 1;
+    memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
+    memcpy(&(to_fill->uname),buffer+263,32); //uname
+    print_struct_header(buffer);
+
+    if(strcmp(uname,to_fill->uname) != 0) return 4;
+    if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
+    //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
+    if(!checkChecksum(buffer,buffer+148))return -3;
+
+    return 0;
 }
 
 int is_end(char* buffer){
@@ -166,11 +188,50 @@ int is_end(char* buffer){
     return 0;
 }
 
-uint64_t checksum(char * buffer){ 
+/**
+ * Decode a TAR octal number.
+ * Ignores everything after the first NUL or space character.
+ * @param data A pointer to a size-byte-long octal-encoded
+ * @param size The size of the field pointer to by the data pointer
+ * @return
+ */
 
-    uint64_t mysum =0;
-    for(int i=0;i<512;i++){
-            mysum += TAR_INT(buffer+i);
+static uint64_t decodeTarOctal(char* data) {
+    unsigned char* currentPtr = (unsigned char*) data+17;
+    uint64_t sum = 0;
+    uint64_t currentMultiplier = 1;
+    //Skip everything after the last NUL/space character
+    //In some TAR archives the size field has non-trailing NULs/spaces, so this is neccessary
+    unsigned char* checkPtr = currentPtr; //This is used to check where the last NUL/space char is
+    for (; checkPtr >= (unsigned char*) data; checkPtr--) {
+        if ((*checkPtr) == 0 || (*checkPtr) == ' ') {
+            currentPtr = checkPtr - 1;
+        }
     }
-    return mysum;
+    for (; currentPtr >= (unsigned char*) data; currentPtr--) {
+        sum += ASCII_TO_NUMBER(*currentPtr)*currentMultiplier;
+        currentMultiplier *= 8;
+    }
+    return sum;
 }
+
+/**
+     * Return true if and only if the header checksum is correct
+     * @return
+     */
+    int checkChecksum(char * buffer,char* checksum) {
+
+        char originalChecksum[8];
+        memcpy(originalChecksum, checksum, 8);
+        memset(checksum, ' ', 8);
+       
+        int64_t unsignedSum = 0;
+        for (int i = 0; i < 512; i++) {
+            unsignedSum += ((unsigned char*) buffer)[i];
+        }
+        
+        memcpy(checksum, originalChecksum, 8);
+        uint64_t referenceChecksum = decodeTarOctal(originalChecksum);
+    
+        return (referenceChecksum == unsignedSum);
+    }
