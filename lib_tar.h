@@ -130,6 +130,10 @@ int is_symlink(int tar_fd, char *path);
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries);
 
+int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries, size_t *no_entries,char*invariant);
+
+int contains(char* path, char **entries,size_t* no_entries);
+
 /**
  * Reads a file at a given path in the archive.
  *

@@ -72,6 +72,11 @@ int check_archive(int tar_fd) {
  *         any other value otherwise.
  */
 int exists(int tar_fd, char *path) {
+
+    buffer = calloc(512,sizeof(char));
+    int re =read(tar_fd,buffer,512);
+
+
     return 0;
 }
 
@@ -98,6 +103,39 @@ int is_dir(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_file(int tar_fd, char *path) {
+
+    exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
+
+    buffer = calloc(512,sizeof(char));
+    int re =read(tar_fd,buffer,512);
+
+    if(re ==0) return 0;
+    counter = 0;
+
+    while(1){
+        char* current_path = (char*) malloc(100);
+        memcpy(current_path,buffer,100);
+        if(strcmp(path,current_path) == 0){
+            char* current_type_flag = (char*) malloc(1);
+            memcpy(current_type_flag,buffer+counter+156,1);
+            if(atoi(current_type_flag) != 0  || *current_type_flag != '\0'){
+                free(current_type_flag);
+                free(current_path);
+                return 0;
+            }
+            else{
+                free(current_path);
+                free(current_type_flag);
+                return 1;
+            }
+        }
+        else{
+            free(current_path);
+            int re = read(tar_fd,buffer,512);
+            if(re ==0) return 0;
+        }
+    }
+    
     return 0;
 }
 
@@ -110,6 +148,38 @@ int is_file(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_symlink(int tar_fd, char *path) {
+    exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
+
+    buffer = calloc(512,sizeof(char));
+    int re =read(tar_fd,buffer,512);
+
+    if(re ==0) return 0;
+    counter = 0;
+
+    while(1){
+        char* current_path = (char*) malloc(100);
+        memcpy(current_path,buffer,100);
+        if(strcmp(path,current_path) == 0){
+            char* current_type_flag = (char*) malloc(1);
+            memcpy(current_type_flag,buffer+counter+156,1);
+            if(atoi(current_type_flag)!=SYMTYPE){
+                free(current_type_flag);
+                free(current_path);
+                return 0;
+            }
+            else{
+                free(current_path);
+                free(current_type_flag);
+                return 1;
+            }
+        }
+        else{
+            free(current_path);
+            int re = read(tar_fd,buffer,512);
+            if(re ==0) return 0;
+        }
+    }
+    
     return 0;
 }
 
@@ -137,7 +207,77 @@ int is_symlink(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
+
+    exists(tar_fd,path);
+
+    ///////////////// récupérer l'invariant //////////////
+    char* buffer_for_name = (char*) calloc(512,sizeof(char));
+    int res = read(tar_fd,buffer_for_name,100);
+    char* name = (char*)malloc(32);
+    memcpy(name,buffer_for_name+265,32);
+    free(buffer_for_name);
+    //////////////////////////////////////////////////////
+
+    buffer = calloc(512,sizeof(char));
+    int len_path = strlen(path);
+    list_recu(tar_fd,buffer,path,len_path,entries,no_entries,name);
+
+}
+
+int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries, size_t *no_entries,char*invariant) {
+
+
+    char* current_path = (char*) malloc(len_path);
+    char* all_current_path = (char*)malloc(100);
+
+    int re =read(tar_fd,buffer,512);
+
+    ////////////////// Condition de sortie ///////////
+    char* name = (char*) malloc(32);
+    memcpy(name,buffer+263,32);
+    if(strcmp(name,invariant)!= 0){
+        return 0;
+    }
+    free(name);
+    /////////////////////////////////////////////////
+
+    memcpy(current_path,buffer,len_path);
+    memcpy(all_current_path,buffer,100);
+
+    if(strcmp(current_path,path) != 0){ //tant qu'on a pas trouvé le chemin
+        free(current_path);
+        free(all_current_path);
+        list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+    }
+    else{
+        if (!contains(all_current_path,entries,no_entries)){
+            entries[*no_entries] = all_current_path;
+            *no_entries ++;
+            free(current_path);
+            list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+        }
+        else{
+            free(all_current_path);
+            free(current_path);
+            list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+        }
+    }
+
     return 0;
+}
+
+// Question à poser : est ce que les fichiers sont dans l'ordre ?
+
+int contains(char* path, char **entries,size_t* no_entries){
+    for (size_t i = 0; i < *no_entries; i++){
+        char* path_to_compare = malloc(100);
+        memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
+        if(strcmp(path_to_compare,entries[i])){
+            return 1;
+        }
+        free(path_to_compare);
+    }
+    return 0;   
 }
 
 /**
