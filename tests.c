@@ -26,6 +26,11 @@ void debug_dump(const uint8_t *bytes, size_t len) {
 void test_list(int fd,char* path,char** entries, size_t* no_entries){
     int ret = list(fd,path,entries,no_entries);
     printf("is_list returned %d \n", ret);
+    for (size_t i = 0; i < 100; i++){
+        printf("%s\n",entries[i]);
+        free(entries[i]);
+    }
+    free(entries);
 }
 
 void test_archive(int fd){
@@ -56,17 +61,15 @@ int main(int argc, char **argv) {
     }
 
     char* path = argv[2];
-    int test_list_bool = atoi(argv[3]);
 
     test_archive(fd);
     test_is_file(fd,path);
     test_is_symlink(fd,path);
 
-    if(test_list_bool){
-        char** entries = (char **) malloc(100*sizeof(char*));
-        int n_entries = 0;
-        test_list(fd,path,entries,&n_entries);
-    }
+    
+    char** entries = (char **) malloc(100*sizeof(char*));
+    size_t n_entries = 0;
+    test_list(fd,path,entries,&n_entries);
 
     return 0;
 }

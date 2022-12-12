@@ -69,6 +69,8 @@ int check_archive(int tar_fd) {
     return counter;
 }
 
+// Question à poser en complexe : Pourquoi on entre dans le fichier texte ?
+
 /**
  * Checks whether an entry exists in the archive. Thibaut
  *
