@@ -225,10 +225,12 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
     ///////////////// récupérer l'invariant //////////////
     char* buffer_for_name = (char*) calloc(512,sizeof(char));
-    int res = read(tar_fd,buffer_for_name,100);
+    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
+    int res = read(tar_fd,buffer_for_name,512);
     char* name = (char*)malloc(32);
     memcpy(name,buffer_for_name+265,32);
     free(buffer_for_name);
+    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     //////////////////////////////////////////////////////
 
     buffer = calloc(512,sizeof(char));
@@ -238,7 +240,6 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 }
 
 int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries, size_t *no_entries,char*invariant) {
-
 
     char* current_path = (char*) malloc(len_path);
     char* all_current_path = (char*)malloc(100);
@@ -255,14 +256,18 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     /////////////////////////////////////////////////
 
     memcpy(current_path,buffer,len_path);
+    printf("%s\n",current_path);
     memcpy(all_current_path,buffer,100);
+    printf("%s\n",all_current_path);
 
     if(strcmp(current_path,path) != 0){ //tant qu'on a pas trouvé le chemin
+        printf("HERE\n");
         free(current_path);
         free(all_current_path);
         list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
     }
     else{
+        printf("HERE2\n");
         if (!contains(all_current_path,entries,no_entries)){
             entries[*no_entries] = all_current_path;
             *no_entries ++;
