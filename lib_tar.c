@@ -1,7 +1,8 @@
 #include "lib_tar.h"
 #include "print_function.h"
 
-// ./tests test.tar 
+// ./tests test.tar
+// tar cvf file.tar
 
 /**
  * Checks whether the archive is valid.
@@ -49,10 +50,16 @@ int check_archive(int tar_fd) {
     while(1){
 
         int res = Read_posix_header(buffer,structure,name);
-        if(res == 4)break;
-        if(res!=0)return res;
+        if(res == 4){
+            break;
+        }
+        if(res!=0){
+            return res;
+        }
         int re = read(tar_fd,buffer,512);
-        if(re==0) break;
+        if(re==0) {
+            break;
+        }
         counter+=1;
         printf("counter %d\n",counter);
     }
@@ -107,18 +114,21 @@ int is_file(int tar_fd, char *path) {
     exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
 
     buffer = calloc(512,sizeof(char));
+    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     int re =read(tar_fd,buffer,512);
-
+    int len_path = strlen(path);
+    
     if(re ==0) return 0;
     counter = 0;
 
     while(1){
-        char* current_path = (char*) malloc(100);
-        memcpy(current_path,buffer,100);
+        //print_struct_header(buffer);
+        char* current_path = (char*) malloc(len_path);
+        memcpy(current_path,buffer,len_path);
         if(strcmp(path,current_path) == 0){
             char* current_type_flag = (char*) malloc(1);
             memcpy(current_type_flag,buffer+counter+156,1);
-            if(atoi(current_type_flag) != 0  || *current_type_flag != '\0'){
+            if(atoi(current_type_flag) != 0  && *current_type_flag != '\0'){
                 free(current_type_flag);
                 free(current_path);
                 return 0;
@@ -132,10 +142,9 @@ int is_file(int tar_fd, char *path) {
         else{
             free(current_path);
             int re = read(tar_fd,buffer,512);
-            if(re ==0) return 0;
+            if(re ==0)return 0;
         }
     }
-    
     return 0;
 }
 
@@ -151,14 +160,16 @@ int is_symlink(int tar_fd, char *path) {
     exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
 
     buffer = calloc(512,sizeof(char));
+    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     int re =read(tar_fd,buffer,512);
+    int len_path = strlen(path);
 
     if(re ==0) return 0;
     counter = 0;
 
     while(1){
-        char* current_path = (char*) malloc(100);
-        memcpy(current_path,buffer,100);
+        char* current_path = (char*) malloc(len_path);
+        memcpy(current_path,buffer,len_path);
         if(strcmp(path,current_path) == 0){
             char* current_type_flag = (char*) malloc(1);
             memcpy(current_type_flag,buffer+counter+156,1);
