@@ -246,6 +246,10 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     memcpy(all_current_path,buffer,100);
     //printf("%s\n",all_current_path);
     //printf("No segfault here2\n");
+    if(is_symlink(tar_fd,all_current_path)){
+        memcpy(current_path,buffer+157,len_path);
+        memcpy(all_current_path,buffer+157,100);
+    }
 
     if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){ //tant qu'on a pas trouvé le chemin
         //printf("HERE\n");

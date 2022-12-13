@@ -22,6 +22,9 @@ Comment tester notre fonction is_symlink ?
 Notre fonction renvoit un pointeur,je suppose que pour que les tests
 inginious puissent tester notre fonction on ne doit pas les free ?
 
+Je ne comprends pas exactement comment gérer les symlink, est ce si notre header est un symlink,
+le nom ne sera jamais égal au path ?
+
 TODO :
 
 is_file : fonctionne
