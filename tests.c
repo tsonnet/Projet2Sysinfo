@@ -49,11 +49,16 @@ void test_list(int fd,char* path,char** entries, size_t* no_entries){
     int ret = list(fd,path,entries,no_entries);
     printf("is_list returned %d \n", ret);
     printf("no_entries vaut %ld\n",*no_entries);
-    printf("Entries list vaut : [");
-    for (size_t i = 0; i < *no_entries-1; i++){
-        printf("%s,",entries[i]);
+    if(*no_entries == 0){
+        printf("Entries list vaut : []");
     }
-    printf("%s]",entries[(*no_entries)-1]);  
+    else {
+        printf("Entries list vaut : [");
+        for (size_t i = 0; i < *no_entries-1; i++){
+            printf("%s,",entries[i]);
+        }
+        printf("%s]",entries[(*no_entries)-1]);
+    }
 }
 
 void test_archive(int fd){

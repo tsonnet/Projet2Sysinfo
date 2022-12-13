@@ -37,10 +37,10 @@ int check_archive(int tar_fd) {
     int re =read(tar_fd,buffer,512);
 
     ///////////////// Test Print /////////////////////////////////////
-    print_list_entier(buffer, 512, "Buffer");
-    print_list_chaine(buffer, 512, "Buffer");
-    print_chaine(buffer+148,8,"Checksum");
-    printf("Number of bytes read %d\n", re);
+    //print_list_entier(buffer, 512, "Buffer");
+    //print_list_chaine(buffer, 512, "Buffer");
+    //print_chaine(buffer+148,8,"Checksum");
+    //printf("Number of bytes read %d\n", re);
     ///////////////////////////////////////////////////////////////////
 
     if(re ==0) return 0;
@@ -50,18 +50,15 @@ int check_archive(int tar_fd) {
     while(1){
 
         int res = Read_posix_header(buffer,structure,name);
-        if(res == 4){
-            break;
-        }
-        if(res!=0){
+        if(res < 0){
             return res;
         }
         int re = read(tar_fd,buffer,512);
         if(re==0) {
             break;
         }
-        counter+=1;
-        printf("counter %d\n",counter);
+        counter+=res;
+        //printf("counter %d\n",counter);
     }
 
     free(structure);
@@ -223,71 +220,54 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
     exists(tar_fd,path);
 
-    ///////////////// récupérer l'invariant //////////////
-    char* buffer_for_name = (char*) calloc(512,sizeof(char));
     lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
-    int res = read(tar_fd,buffer_for_name,512);
-    char* name = (char*)malloc(32);
-    memcpy(name,buffer_for_name+265,32);
-    free(buffer_for_name);
-    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
-    //////////////////////////////////////////////////////
-
     buffer = calloc(512,sizeof(char));
     int len_path = strlen(path);
-    *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0,name);
+    *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0);
     return 1;
 }
 
-int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries,int no_entries,char*invariant) {
+int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries,int no_entries) {
 
     char* current_path = (char*) malloc(len_path);
     char* all_current_path = (char*)malloc(100);
 
-    printf("No segfault here\n");
+    //printf("No segfault here\n");
     int re =read(tar_fd,buffer,512);
-    print_struct_header(buffer);
-
-    ////////////////// Condition de sortie ///////////
-    char* name = (char*) malloc(32);
-    memcpy(name,buffer+265,32);
-    printf("name : %s\n",name);
-    printf("invariant : %s\n",invariant);
-    if(strcmp(name,invariant)!= 0){
-        printf("HERE ???\n");
-        printf("no_entries value : %d\n", no_entries);
+    //////////////// Condition de sortie ////////////////
+    if(re == 0){
         return no_entries;
     }
-    free(name);
-    /////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
+    //print_struct_header(buffer);
 
     memcpy(current_path,buffer,len_path);
-    printf("%s\n",current_path);
+    //printf("%s\n",current_path);
     memcpy(all_current_path,buffer,100);
-    printf("%s\n",all_current_path);
-    printf("No segfault here2\n");
+    //printf("%s\n",all_current_path);
+    //printf("No segfault here2\n");
 
     if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){ //tant qu'on a pas trouvé le chemin
-        printf("HERE\n");
+        //printf("HERE\n");
         free(current_path);
         free(all_current_path);
-        list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+        list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
     }
     else{
-        printf("HERE2\n");
+        //printf("HERE2\n");
         if (contains(all_current_path,entries,no_entries)==1){
-            printf("HERE3\n");
+            //printf("HERE3\n");
             entries[no_entries] = all_current_path;
             no_entries ++;
-            printf("number_of_entries_after_inc : %d\n",no_entries);
+            //printf("number_of_entries_after_inc : %d\n",no_entries);
             free(current_path);
-            list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+            list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
         else{
-            printf("HERE4\n");
+            //printf("HERE4\n");
             free(all_current_path);
             free(current_path);
-            list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
+            list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
     }
 }
@@ -295,7 +275,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
 // Question à poser : est ce que les fichiers sont dans l'ordre ?
 
 int contains(char* path, char **entries,int no_entries){
-    printf("number of entries : %d\n",no_entries);
+    //printf("number of entries : %d\n",no_entries);
     if(no_entries == 0){ //entries est vide
         return 1;
     }
@@ -303,8 +283,8 @@ int contains(char* path, char **entries,int no_entries){
         for (size_t i = 0; i < no_entries; i++){
             char* path_to_compare = malloc(strlen(entries[i]));
             memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
-            printf("%s\n",path_to_compare);
-            printf("%s\n",entries[i]);
+            //printf("%s\n",path_to_compare);
+            //printf("%s\n",entries[i]);
             if(strcmp(path_to_compare,entries[i])==0){
                 return 0;
             }
@@ -343,14 +323,14 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill,char * uname){
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
-    print_struct_header(buffer);
+    //print_struct_header(buffer);
 
-    if(strcmp(uname,to_fill->uname) != 0) return 4;
+    if(strcmp(uname,to_fill->uname) != 0) return 0;
     if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
     //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
     if(!checkChecksum(buffer,buffer+148))return -3;
 
-    return 0;
+    return 1;
 }
 
 int is_end(char* buffer){
