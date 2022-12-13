@@ -9,6 +9,28 @@
  * You are free to use this file to write tests for your implementation
  */
 
+/**
+Questions :
+
+Pourquoi quand on itère dans nos headers avec la fonctions read, lorsqu'on atteint
+un fichier, par exemple txt, le prochain truc qu'on lit c'est ce fichier, et un pas
+un autre headers ? Est ce qu'on doit déplacer notre tête de fichier par la taille
+de ce fichier pour arriver au prochain header ?
+
+Comment tester notre fonction is_symlink ?
+
+Notre fonction renvoit un pointeur,je suppose que pour que les tests
+inginious puissent tester notre fonction on ne doit pas les free ?
+
+TODO :
+
+is_file : fonctionne
+Archive : revoir la condition de sortie
+list : revoir la condition de sortie, le reste fonctionne
+       gérer le cas SYMLINK en utlisant is_symlink
+
+ */
+
 void debug_dump(const uint8_t *bytes, size_t len) {
     for (int i = 0; i < len;) {
         printf("%04x:  ", (int) i);
@@ -29,10 +51,9 @@ void test_list(int fd,char* path,char** entries, size_t* no_entries){
     printf("no_entries vaut %ld\n",*no_entries);
     printf("Entries list vaut : [");
     for (size_t i = 0; i < *no_entries-1; i++){
-        printf("%s\n",entries[i]);
+        printf("%s,",entries[i]);
     }
-    printf("%s]",entries[(*no_entries)-1]);
-    
+    printf("%s]",entries[(*no_entries)-1]);  
 }
 
 void test_archive(int fd){
@@ -73,6 +94,8 @@ int main(int argc, char **argv) {
     size_t* n_entries = (size_t*) malloc(sizeof(size_t));
     *n_entries = 0;
     test_list(fd,path,entries,n_entries);
+
+    //gérer les free de entries
 
     return 0;
 }
