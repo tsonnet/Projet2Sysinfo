@@ -235,22 +235,28 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
     buffer = calloc(512,sizeof(char));
     int len_path = strlen(path);
-    list_recu(tar_fd,buffer,path,len_path,entries,no_entries,name);
-
+    *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0,name);
+    return 1;
 }
 
-int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries, size_t *no_entries,char*invariant) {
+int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries,int no_entries,char*invariant) {
 
     char* current_path = (char*) malloc(len_path);
     char* all_current_path = (char*)malloc(100);
 
+    printf("No segfault here\n");
     int re =read(tar_fd,buffer,512);
+    print_struct_header(buffer);
 
     ////////////////// Condition de sortie ///////////
     char* name = (char*) malloc(32);
-    memcpy(name,buffer+263,32);
+    memcpy(name,buffer+265,32);
+    printf("name : %s\n",name);
+    printf("invariant : %s\n",invariant);
     if(strcmp(name,invariant)!= 0){
-        return 0;
+        printf("HERE ???\n");
+        printf("no_entries value : %d\n", no_entries);
+        return no_entries;
     }
     free(name);
     /////////////////////////////////////////////////
@@ -259,8 +265,9 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     printf("%s\n",current_path);
     memcpy(all_current_path,buffer,100);
     printf("%s\n",all_current_path);
+    printf("No segfault here2\n");
 
-    if(strcmp(current_path,path) != 0){ //tant qu'on a pas trouvé le chemin
+    if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){ //tant qu'on a pas trouvé le chemin
         printf("HERE\n");
         free(current_path);
         free(all_current_path);
@@ -268,34 +275,43 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     }
     else{
         printf("HERE2\n");
-        if (!contains(all_current_path,entries,no_entries)){
-            entries[*no_entries] = all_current_path;
-            *no_entries ++;
+        if (contains(all_current_path,entries,no_entries)==1){
+            printf("HERE3\n");
+            entries[no_entries] = all_current_path;
+            no_entries ++;
+            printf("number_of_entries_after_inc : %d\n",no_entries);
             free(current_path);
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
         }
         else{
+            printf("HERE4\n");
             free(all_current_path);
             free(current_path);
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries,invariant);
         }
     }
-
-    return 0;
 }
 
 // Question à poser : est ce que les fichiers sont dans l'ordre ?
 
-int contains(char* path, char **entries,size_t* no_entries){
-    for (size_t i = 0; i < *no_entries; i++){
-        char* path_to_compare = malloc(100);
-        memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
-        if(strcmp(path_to_compare,entries[i])){
-            return 1;
-        }
-        free(path_to_compare);
+int contains(char* path, char **entries,int no_entries){
+    printf("number of entries : %d\n",no_entries);
+    if(no_entries == 0){ //entries est vide
+        return 1;
     }
-    return 0;   
+    else{
+        for (size_t i = 0; i < no_entries; i++){
+            char* path_to_compare = malloc(strlen(entries[i]));
+            memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
+            printf("%s\n",path_to_compare);
+            printf("%s\n",entries[i]);
+            if(strcmp(path_to_compare,entries[i])==0){
+                return 0;
+            }
+            free(path_to_compare);
+        }
+    }
+    return 1;   
 }
 
 /**

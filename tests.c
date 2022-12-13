@@ -26,11 +26,13 @@ void debug_dump(const uint8_t *bytes, size_t len) {
 void test_list(int fd,char* path,char** entries, size_t* no_entries){
     int ret = list(fd,path,entries,no_entries);
     printf("is_list returned %d \n", ret);
-    for (size_t i = 0; i < 100; i++){
+    printf("no_entries vaut %ld\n",*no_entries);
+    printf("Entries list vaut : [");
+    for (size_t i = 0; i < *no_entries-1; i++){
         printf("%s\n",entries[i]);
-        free(entries[i]);
     }
-    free(entries);
+    printf("%s]",entries[(*no_entries)-1]);
+    
 }
 
 void test_archive(int fd){
@@ -68,8 +70,9 @@ int main(int argc, char **argv) {
 
     
     char** entries = (char **) malloc(100*sizeof(char*));
-    size_t n_entries = 0;
-    test_list(fd,path,entries,&n_entries);
+    size_t* n_entries = (size_t*) malloc(sizeof(size_t));
+    *n_entries = 0;
+    test_list(fd,path,entries,n_entries);
 
     return 0;
 }
