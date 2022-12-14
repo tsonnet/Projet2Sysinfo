@@ -49,7 +49,7 @@ int check_archive(int tar_fd) {
 
     while(1){
 
-        int res = Read_posix_header(buffer,structure,name);
+        int res = Read_posix_header(buffer,structure);
         if(res < 0){
             return res;
         }
@@ -77,15 +77,31 @@ int check_archive(int tar_fd) {
  * @return zero if no entry at the given path exists in the archive,
  *         any other value otherwise.
  */
-int exists(int tar_fd, char *path) {
 
+int exists(int tar_fd, char *path) {// Return the size of the file in bytes
+    lseek(tar_fd,0,SEEK_SET);
     buffer = calloc(512,sizeof(char));
+    tar_header_t * Header = malloc(sizeof(tar_header_t));
     int re =read(tar_fd,buffer,512);
-
-
-    return 0;
+    Read_posix_header(buffer,Header);
+    __uint128_t* length= TAR_INT( Header->size);
+    while (!strcmp(Header->name,path))
+    {  
+        lseek(tar_fd,length,SEEK_CUR);
+        int re =read(tar_fd,buffer,512);
+        if(re != 512) return 0;
+        Read_posix_header(buffer,Header);
+        length = TAR_INT(Header->size);
+    }
+    free(Header);
+    return length;
 }
 
+int count_block(int len){
+    int to_ret = len/512;
+    if(len%512) return to_ret+1;
+    return to_ret;
+}
 /**
  * Checks whether an entry exists in the archive and is a directory. Thibaut
  *
@@ -294,6 +310,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
     }
+    return 0;
 }
 
 // Question à poser : est ce que les fichiers sont dans l'ordre ?
@@ -334,10 +351,16 @@ int contains(char* path, char **entries,int no_entries){
  *
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
-    return 0;
+    lseek(tar_fd,0,SEEK_SET);
+    int filePosition =exists(tar_fd,path);
+    if(!filePosition) return -1; //Exist set the file descriptor
+    int LengthOfFile = read(tar_fd,buffer,*len);
+    if(offset > LengthOfFile) return -2;
+    int to_ret = LengthOfFile - *len;
+    return to_ret;
 }
 
-int Read_posix_header(char* buffer, tar_header_t* to_fill,char * uname){
+int Read_posix_header(char* buffer, tar_header_t* to_fill){
 
     memcpy(&(to_fill->name),buffer,100); //name
     memcpy(&(to_fill->magic),buffer+257,5);//value
@@ -345,8 +368,6 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill,char * uname){
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
     //print_struct_header(buffer);
-
-    if(strcmp(uname,to_fill->uname) != 0) return 0;
     if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
     //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
     if(!checkChecksum(buffer,buffer+148))return -3;
