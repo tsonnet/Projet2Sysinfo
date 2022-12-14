@@ -77,7 +77,6 @@ int check_archive(int tar_fd) {
  * @return zero if no entry at the given path exists in the archive,
  *         any other value otherwise.
  */
-
 int exists(int tar_fd, char *path) {// Return the size of the file in bytes
     lseek(tar_fd,0,SEEK_SET);
     buffer = calloc(512,sizeof(char));
@@ -96,12 +95,12 @@ int exists(int tar_fd, char *path) {// Return the size of the file in bytes
     free(Header);
     return length;
 }
-
 int count_block(int len){
     int to_ret = len/512;
     if(len%512) return to_ret+1;
     return to_ret;
 }
+
 /**
  * Checks whether an entry exists in the archive and is a directory. Thibaut
  *
@@ -310,7 +309,6 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
     }
-    return 0;
 }
 
 // Question à poser : est ce que les fichiers sont dans l'ordre ?
@@ -361,7 +359,6 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
 }
 
 int Read_posix_header(char* buffer, tar_header_t* to_fill){
-
     memcpy(&(to_fill->name),buffer,100); //name
     memcpy(&(to_fill->magic),buffer+257,5);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
@@ -371,7 +368,6 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
     //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
     if(!checkChecksum(buffer,buffer+148))return -3;
-
     return 1;
 }
 
