@@ -246,7 +246,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
         return no_entries;
     }
     /////////////////////////////////////////////////////
-    //print_struct_header(buffer);
+    print_struct_header(buffer);
 
     memcpy(current_path,buffer,len_path);
     memcpy(all_current_path,buffer,100);
@@ -260,7 +260,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     lseek(tar_fd,current_position,SEEK_SET);
 
     /////////////// Check File //////////////////////////
-    int size_of_file = is_file(tar_fd,all_current_path);
+    int size_of_file = is_file(tar_fd,all_current_path); //0 sinon
     if(size_of_file%512 == 0){
         lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
     }
@@ -268,23 +268,27 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
         lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
     }
 
-    if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){ //tant qu'on a pas trouvé le chemin
+    /////////////// Main function ///////////////////////
+
+    if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){
+         //tant qu'on a pas trouvé le chemin
         free(current_path);
         free(all_current_path);
         list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
+
     }
     else{
-        //printf("HERE2\n");
+       
         if (contains(all_current_path,entries,no_entries)==1){
-            //printf("HERE3\n");
+            //On ajoute le chemin dans la liste, et on incrémente sa taille
             entries[no_entries] = all_current_path;
             no_entries ++;
-            //printf("number_of_entries_after_inc : %d\n",no_entries);
             free(current_path);
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
+
         }
         else{
-            //printf("HERE4\n");
+            //Si elle contient déjà le path, on continue
             free(all_current_path);
             free(current_path);
             list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
@@ -295,7 +299,6 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
 // Question à poser : est ce que les fichiers sont dans l'ordre ?
 
 int contains(char* path, char **entries,int no_entries){
-    //printf("number of entries : %d\n",no_entries);
     if(no_entries == 0){ //entries est vide
         return 1;
     }
@@ -303,8 +306,6 @@ int contains(char* path, char **entries,int no_entries){
         for (size_t i = 0; i < no_entries; i++){
             char* path_to_compare = malloc(strlen(entries[i]));
             memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
-            //printf("%s\n",path_to_compare);
-            //printf("%s\n",entries[i]);
             if(strcmp(path_to_compare,entries[i])==0){
                 return 0;
             }
