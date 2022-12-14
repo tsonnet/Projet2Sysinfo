@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -Werror
+CFLAGS=-g #-Wall -Werror
 
 all: tests lib_tar.o  #include <stdlib.h>
 
