@@ -122,20 +122,26 @@ int is_file(int tar_fd, char *path) {
 
     while(1){
         //print_struct_header(buffer);
-        char* current_path = (char*) malloc(len_path);
-        memcpy(current_path,buffer,len_path);
+        char* current_path = (char*) malloc(100);
+        memcpy(current_path,buffer,100);
+        //printf("current path : %s\n",current_path);
         if(strcmp(path,current_path) == 0){
             char* current_type_flag = (char*) malloc(1);
             memcpy(current_type_flag,buffer+counter+156,1);
             if(atoi(current_type_flag) != 0  && *current_type_flag != '\0'){
                 free(current_type_flag);
                 free(current_path);
+                //printf("Je ne suis pas un fichier zebi\n");
                 return 0;
             }
             else{
+                char* size_of_file = (char*) malloc(8);
+                memcpy(size_of_file,buffer+128,8);
+                int size_of_file_int = TAR_INT(size_of_file);
                 free(current_path);
                 free(current_type_flag);
-                return 1;
+                free(size_of_file);
+                return size_of_file_int;
             }
         }
         else{
@@ -223,16 +229,17 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     buffer = calloc(512,sizeof(char));
     int len_path = strlen(path);
+
     *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0);
     return 1;
 }
 
 int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries,int no_entries) {
+    
 
     char* current_path = (char*) malloc(len_path);
     char* all_current_path = (char*)malloc(100);
 
-    //printf("No segfault here\n");
     int re =read(tar_fd,buffer,512);
     //////////////// Condition de sortie ////////////////
     if(re == 0){
@@ -242,17 +249,26 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     //print_struct_header(buffer);
 
     memcpy(current_path,buffer,len_path);
-    //printf("%s\n",current_path);
     memcpy(all_current_path,buffer,100);
-    //printf("%s\n",all_current_path);
-    //printf("No segfault here2\n");
+
+    //////////////// Check SymLink //////////////////////
+    int current_position = lseek(tar_fd,0,SEEK_CUR);
     if(is_symlink(tar_fd,all_current_path)){
         memcpy(current_path,buffer+157,len_path);
         memcpy(all_current_path,buffer+157,100);
     }
+    lseek(tar_fd,current_position,SEEK_SET);
+
+    /////////////// Check File //////////////////////////
+    int size_of_file = is_file(tar_fd,all_current_path);
+    if(size_of_file%512 == 0){
+        lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
+    }
+    else{
+        lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
+    }
 
     if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){ //tant qu'on a pas trouvé le chemin
-        //printf("HERE\n");
         free(current_path);
         free(all_current_path);
         list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
