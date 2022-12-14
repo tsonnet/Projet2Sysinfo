@@ -74,6 +74,13 @@ void test_is_file(int fd,char* path){
     printf("is_file returned %d\n", ret);
 }
 
+void test_exist(int fd,char*path){
+    int ret = exists(fd,path);
+    printf("La longueur du fichier est de %d char \n", ret);
+    char* buff = malloc(6);
+    read(fd,buff,6);
+    printf("%c%c%c%c%c%c",buff[0],buff[1],buff[2],buff[3],buff[4],buff[5]);
+}
 void test_is_symlink(int fd,char* path){
     int ret = is_symlink(fd,path);
     printf("is_symlink returned %d \n",ret);
@@ -93,10 +100,11 @@ int main(int argc, char **argv) {
 
     char* path = argv[2];
 
-    test_archive(fd);
-    test_is_file(fd,path);
-    test_is_symlink(fd,path);
+    //test_archive(fd);
+    //test_is_file(fd,path);
+    //test_is_symlink(fd,path);
 
+    test_exist(fd,path);
     
     char** entries = (char **) malloc(100*sizeof(char*));
     size_t* n_entries = (size_t*) malloc(sizeof(size_t));
