@@ -44,12 +44,10 @@ int check_archive(int tar_fd) {
     ///////////////////////////////////////////////////////////////////
 
     if(re ==0) return 0;
-    char name[32];
-    memcpy(name,buffer+263,32); //on enregistre le nom de l'utilisateur, qui sera toujours le meme, sauf pour les données du fichier
 
     while(1){
 
-        int res = Read_posix_header(buffer,structure);
+        int res = Read_posix_header(buffer,structure,tar_fd);
         if(res < 0){
             return res;
         }
@@ -58,7 +56,6 @@ int check_archive(int tar_fd) {
             break;
         }
         counter+=res;
-        //printf("counter %d\n",counter);
     }
 
     free(structure);
@@ -82,14 +79,14 @@ int exists(int tar_fd, char *path) {// Return the size of the file in bytes
     buffer = calloc(512,sizeof(char));
     tar_header_t * Header = malloc(sizeof(tar_header_t));
     int re =read(tar_fd,buffer,512);
-    Read_posix_header(buffer,Header);
-    __uint128_t* length= TAR_INT( Header->size);
+    Read_posix_header(buffer,Header,tar_fd);
+    int length= TAR_INT( Header->size);
     while (!strcmp(Header->name,path))
     {  
         lseek(tar_fd,length,SEEK_CUR);
         int re =read(tar_fd,buffer,512);
         if(re != 512) return 0;
-        Read_posix_header(buffer,Header);
+        Read_posix_header(buffer,Header,tar_fd);
         length = TAR_INT(Header->size);
     }
     free(Header);
@@ -358,12 +355,22 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     return to_ret;
 }
 
-int Read_posix_header(char* buffer, tar_header_t* to_fill){
+int Read_posix_header(char* buffer, tar_header_t* to_fill,int tar_fd){
     memcpy(&(to_fill->name),buffer,100); //name
     memcpy(&(to_fill->magic),buffer+257,5);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
+    /**
+    int current_position = lseek(tar_fd,0,SEEK_CUR);
+    int size_of_file = is_file(tar_fd,to_fill->name); //0 sinon
+    if(size_of_file%512 == 0){
+        lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
+    }
+    else{
+        lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
+    }
+    **/
     //print_struct_header(buffer);
     if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
     //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
