@@ -47,7 +47,7 @@ int check_archive(int tar_fd) {
 
     while(1){
 
-        int res = Read_posix_header(buffer,structure,tar_fd);
+        int res = Read_posix_header(buffer,structure);
         if(res < 0){
             return res;
         }
@@ -73,24 +73,29 @@ int check_archive(int tar_fd) {
  *
  * @return zero if no entry at the given path exists in the archive,
  *         any other value otherwise.
+ *         Return the size of the file in bytes +1 to prevent the case where the file length is 0 
  */
-int exists(int tar_fd, char *path) {// Return the size of the file in bytes
+
+int exists(int tar_fd, char *path) {
     lseek(tar_fd,0,SEEK_SET);
     buffer = calloc(512,sizeof(char));
-    tar_header_t * Header = malloc(sizeof(tar_header_t));
+    tar_header_t  Header;
     int re =read(tar_fd,buffer,512);
-    Read_posix_header(buffer,Header,tar_fd);
-    int length= TAR_INT( Header->size);
-    while (!strcmp(Header->name,path))
-    {  
+    Read_posix_header(buffer,&Header);
+    int length= TAR_INT( Header.size);
+    while (strcmp(Header.name,path)!=0)
+    {
+        //printf("%s\n",Header->name);
         lseek(tar_fd,length,SEEK_CUR);
         int re =read(tar_fd,buffer,512);
         if(re != 512) return 0;
-        Read_posix_header(buffer,Header,tar_fd);
-        length = TAR_INT(Header->size);
+        Read_posix_header(buffer,&Header);
+        length = TAR_INT(Header.size);
+        length = count_block(length)*512;
     }
-    free(Header);
-    return length;
+    length = TAR_INT(Header.size);
+    if(strcmp(Header.name,path)==0) return length+1;
+    return 0;
 }
 int count_block(int len){
     int to_ret = len/512;
@@ -108,7 +113,23 @@ int count_block(int len){
  *         any other value otherwise.
  */
 int is_dir(int tar_fd, char *path) {
-    return 0;
+    lseek(tar_fd,0,SEEK_SET);
+    buffer = calloc(512,sizeof(char));
+    tar_header_t  Header;
+    int re =read(tar_fd,buffer,512);
+    Read_posix_header(buffer,&Header);
+    int length= TAR_INT( Header.size);
+    length = count_block(length)*512;
+    while (strcmp(Header.name,path)!=0)
+    { 
+        lseek(tar_fd,length,SEEK_CUR);
+        int re =read(tar_fd,buffer,512);
+        if(re != 512) return 0;
+        Read_posix_header(buffer,&Header);
+        length = TAR_INT(Header.size);
+        length = count_block(length)*512;
+    }
+    return Header.typeflag==DIRTYPE;
 }
 
 /**
@@ -346,17 +367,54 @@ int contains(char* path, char **entries,int no_entries){
  *
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
-    lseek(tar_fd,0,SEEK_SET);
-    int filePosition =exists(tar_fd,path);
-    if(!filePosition) return -1; //Exist set the file descriptor
-    int LengthOfFile = read(tar_fd,buffer,*len);
-    if(offset > LengthOfFile) return -2;
-    int to_ret = LengthOfFile - *len;
+    int length_file;
+    int found = 0;
+    int length;
+    lseek(tar_fd,0,SEEK_SET); // To be sure we start at the beginning of the file
+    buffer = calloc(512,sizeof(char));
+    tar_header_t * Header = malloc(sizeof(tar_header_t));
+    int re =read(tar_fd,buffer,512);
+    Read_posix_header(buffer,Header);
+    while (re==512) {// Read until EOF
+        if (strcmp(Header->name, path) == 0) {
+        found = 1;
+        break;
+        }
+        length = count_block(TAR_INT(Header->size))*512;
+        lseek(tar_fd,length, SEEK_CUR);
+        re =read(tar_fd,buffer,512);
+        Read_posix_header(buffer,Header);
+    }
+
+    if (found==0) {// We didn't find (found==0)! 
+        return -1;
+    }
+    if (Header->typeflag != REGTYPE && Header->typeflag !=AREGTYPE) { //REGTYPE et AREGTYPE pour regular File
+        return -1;
+    }
+
+    length_file = TAR_INT(Header->size);// Octal to Int
+
+    if (offset > length_file) {// IS the offSet bigger thant length file 
+        return -2;
+    }
+
+    lseek(tar_fd, offset, SEEK_CUR); // Put the reader at the good position
+    if(*len> length_file-offset){
+        *len = length_file-offset;
+    }
+
+    *len  = read(tar_fd, dest, *len); // Read the file and set the IN-out arg
+
+    int to_ret = length_file - offset - *len;
+    if(to_ret<0) return 0;
     return to_ret;
 }
 
-int Read_posix_header(char* buffer, tar_header_t* to_fill,int tar_fd){
+int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->name),buffer,100); //name
+    memcpy(&(to_fill->size),buffer+124,12); //size 
+    memcpy(&(to_fill->typeflag),buffer+156,1); //TypeFlag
     memcpy(&(to_fill->magic),buffer+257,5);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum

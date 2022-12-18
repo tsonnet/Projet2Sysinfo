@@ -154,13 +154,15 @@ int contains(char* path, char **entries,int no_entries);
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len);
 
-int Read_posix_header(char* buffer, tar_header_t* to_fill,int tar_fd);
+int Read_posix_header(char* buffer, tar_header_t* to_fill);
 
 int is_end(char* buffer);
 
 uint64_t checksum(char * buffer);
 
 int checkChecksum(char * buffer,char* checksum);
+
+int count_block(int len);
 
 static uint64_t decodeTarOctal(char* data);
 
