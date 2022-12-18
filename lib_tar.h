@@ -162,6 +162,8 @@ uint64_t checksum(char * buffer);
 
 int checkChecksum(char * buffer,char* checksum);
 
+int count_block(int len);
+
 static uint64_t decodeTarOctal(char* data);
 
 #endif
