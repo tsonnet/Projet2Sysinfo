@@ -25,6 +25,7 @@
 char* buffer;
 tar_header_t* structure;
 int counter;
+int verbose = 0;
 
 int check_archive(int tar_fd) {
 
@@ -32,30 +33,37 @@ int check_archive(int tar_fd) {
     counter =0;
     structure = malloc(sizeof(tar_header_t));
     buffer = calloc(512,sizeof(char));
+    lseek(tar_fd,0,SEEK_SET);
     //////////////////////////////////////////////////////////////////
 
-    int re =read(tar_fd,buffer,512);
-
-    ///////////////// Test Print /////////////////////////////////////
-    //print_list_entier(buffer, 512, "Buffer");
-    //print_list_chaine(buffer, 512, "Buffer");
-    //print_chaine(buffer+148,8,"Checksum");
-    //printf("Number of bytes read %d\n", re);
-    ///////////////////////////////////////////////////////////////////
-
-    if(re ==0) return 0;
-
-    while(1){
-
+    while(read(tar_fd,buffer,512) != 0){
         int res = Read_posix_header(buffer,structure);
+
+        ////////// Décalage si on tombe sur un dossier ///////////////
+        int current_position = lseek(tar_fd,0,SEEK_CUR);
+        int size_of_file = TAR_INT(structure->size);
+        if(size_of_file > 1){
+
+            if(size_of_file%512 == 0){
+                lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
+            }
+            else{
+                lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
+            }
+        }
+        ////////////////////////////////////////////////////////////////
         if(res < 0){
-            return res;
+            if(*structure->name == '\0'){
+                continue;
+            }
+            else{
+                return res;
+            }
         }
-        int re = read(tar_fd,buffer,512);
-        if(re==0) {
-            break;
+        else{
+            counter+=1;
         }
-        counter+=res;
+
     }
 
     free(structure);
@@ -81,6 +89,7 @@ int exists(int tar_fd, char *path) {
     buffer = calloc(512,sizeof(char));
     tar_header_t  Header;
     int re =read(tar_fd,buffer,512);
+    if(re == 0){return 0;}
     Read_posix_header(buffer,&Header);
     int length= TAR_INT( Header.size);
     while (strcmp(Header.name,path)!=0)
@@ -117,6 +126,7 @@ int is_dir(int tar_fd, char *path) {
     buffer = calloc(512,sizeof(char));
     tar_header_t  Header;
     int re =read(tar_fd,buffer,512);
+    if(re == 0){return 0;}
     Read_posix_header(buffer,&Header);
     int length= TAR_INT( Header.size);
     length = count_block(length)*512;
@@ -143,28 +153,27 @@ int is_dir(int tar_fd, char *path) {
  */
 int is_file(int tar_fd, char *path) {
 
-    exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
+    if (exists(tar_fd,path) == 0){return 0;}//check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
 
     buffer = calloc(512,sizeof(char));
     lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     int re =read(tar_fd,buffer,512);
-    int len_path = strlen(path);
     
     if(re ==0) return 0;
     counter = 0;
 
     while(1){
-        //print_struct_header(buffer);
+        if(verbose) print_struct_header(buffer);
         char* current_path = (char*) malloc(100);
         memcpy(current_path,buffer,100);
-        //printf("current path : %s\n",current_path);
+        if(verbose) printf("current path : %s\n",current_path);
         if(strcmp(path,current_path) == 0){
             char* current_type_flag = (char*) malloc(1);
             memcpy(current_type_flag,buffer+counter+156,1);
             if(atoi(current_type_flag) != 0  && *current_type_flag != '\0'){
                 free(current_type_flag);
                 free(current_path);
-                //printf("Je ne suis pas un fichier zebi\n");
+                if(verbose) printf("Je ne suis pas un fichier zebi\n");
                 return 0;
             }
             else{
@@ -195,7 +204,7 @@ int is_file(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_symlink(int tar_fd, char *path) {
-    exists(tar_fd,path); //check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
+    if (exists(tar_fd,path) == 0){return 0;}///check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
 
     buffer = calloc(512,sizeof(char));
     lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
@@ -211,7 +220,7 @@ int is_symlink(int tar_fd, char *path) {
         if(strcmp(path,current_path) == 0){
             char* current_type_flag = (char*) malloc(1);
             memcpy(current_type_flag,buffer+counter+156,1);
-            if(atoi(current_type_flag)!=SYMTYPE){
+            if(TAR_INT(current_type_flag)!=SYMTYPE){
                 free(current_type_flag);
                 free(current_path);
                 return 0;
@@ -257,7 +266,7 @@ int is_symlink(int tar_fd, char *path) {
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
-    exists(tar_fd,path);
+    if (exists(tar_fd,path) == 0){return 0;}
 
     lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     buffer = calloc(512,sizeof(char));
@@ -276,10 +285,12 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     int re =read(tar_fd,buffer,512);
     //////////////// Condition de sortie ////////////////
     if(re == 0){
+        free(current_path);
+        free(all_current_path);
         return no_entries;
     }
     /////////////////////////////////////////////////////
-    print_struct_header(buffer);
+    if(verbose) print_struct_header(buffer);
 
     memcpy(current_path,buffer,len_path);
     memcpy(all_current_path,buffer,100);
@@ -307,7 +318,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
          //tant qu'on a pas trouvé le chemin
         free(current_path);
         free(all_current_path);
-        list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
+        return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
 
     }
     else{
@@ -317,19 +328,18 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
             entries[no_entries] = all_current_path;
             no_entries ++;
             free(current_path);
-            list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
+            return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
 
         }
         else{
             //Si elle contient déjà le path, on continue
             free(all_current_path);
             free(current_path);
-            list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
+            return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
     }
 }
 
-// Question à poser : est ce que les fichiers sont dans l'ordre ?
 
 int contains(char* path, char **entries,int no_entries){
     if(no_entries == 0){ //entries est vide
@@ -419,17 +429,8 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
-    /**
-    int current_position = lseek(tar_fd,0,SEEK_CUR);
-    int size_of_file = is_file(tar_fd,to_fill->name); //0 sinon
-    if(size_of_file%512 == 0){
-        lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
-    }
-    else{
-        lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
-    }
-    **/
-    //print_struct_header(buffer);
+   
+    if(verbose) print_struct_header(buffer);
     if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
     //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
     if(!checkChecksum(buffer,buffer+148))return -3;
@@ -453,7 +454,7 @@ int is_end(char* buffer){
  * @return
  */
 
-static uint64_t decodeTarOctal(char* data) {
+uint64_t decodeTarOctal(char* data) {
     unsigned char* currentPtr = (unsigned char*) data+17;
     uint64_t sum = 0;
     uint64_t currentMultiplier = 1;
