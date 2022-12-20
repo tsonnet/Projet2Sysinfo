@@ -37,6 +37,7 @@ int check_archive(int tar_fd) {
     //////////////////////////////////////////////////////////////////
 
     while(read(tar_fd,buffer,512) != 0){
+      
         int res = Read_posix_header(buffer,structure);
 
         ////////// Décalage si on tombe sur un dossier ///////////////
@@ -53,7 +54,6 @@ int check_archive(int tar_fd) {
         }
        
         ////////////////////////////////////////////////////////////////
-
         /**
         printf("la valeur de version vaut %s\n", structure->version);
         printf("la taille de version devrait valoir 2 mais vaut %ld", strlen(structure->version));
@@ -231,7 +231,8 @@ int is_symlink(int tar_fd, char *path) {
         length = TAR_INT(Header.size);
         length = count_block(length)*512;
     }
-    return Header.typeflag==SYMTYPE;
+    
+    return Header.typeflag == SYMTYPE;
 }
 
 
@@ -265,7 +266,9 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     buffer = calloc(512,sizeof(char));
     int len_path = strlen(path);
 
+    lseek(tar_fd,0,SEEK_SET);
     *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0);
+
     return 1;
 }
 
@@ -290,11 +293,13 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
 
     //////////////// Check SymLink //////////////////////
     int current_position = lseek(tar_fd,0,SEEK_CUR);
+    /**
     if(is_symlink(tar_fd,all_current_path)){
         memcpy(current_path,buffer+157,len_path);
         memcpy(all_current_path,buffer+157,100);
     }
     lseek(tar_fd,current_position,SEEK_SET);
+    **/
 
     /////////////// Check File //////////////////////////
     int size_of_file = is_file(tar_fd,all_current_path); //0 sinon
@@ -423,14 +428,15 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
     
-    char* version = malloc(2);
+    char* version = calloc(1,2);
+    //char* version = malloc(2);
     memcpy(version, buffer + 263,2);
 
     char* magic_to_compare = malloc(6);
     memcpy(magic_to_compare,TMAGIC,6);
     magic_to_compare[5] = '\0';
 
-    if(verbose) print_struct_header(buffer);
+    //print_struct_header(buffer);
     /**
     printf("Magic vaut : %s\n", to_fill->magic);
     printf("la longuer de magic vaut : %d\n", strlen(to_fill->magic));
@@ -451,6 +457,8 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
         free(version);
         return -3;
     }
+    free(magic_to_compare);
+    free(version);
     return 1;
 }
 
