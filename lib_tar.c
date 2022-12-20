@@ -231,7 +231,37 @@ int is_symlink(int tar_fd, char *path) {
         length = TAR_INT(Header.size);
         length = count_block(length)*512;
     }
+    return Header.typeflag == SYMTYPE;
+}
+
+int is_symlink_for_list(int tar_fd, char *path) {
+    if (exists(tar_fd,path) == 0){return 0;}
+
+    lseek(tar_fd,0,SEEK_SET);
+    buffer = calloc(512,sizeof(char));
+    tar_header_t  Header;
+    int re =read(tar_fd,buffer,512);
+    if(re == 0){return 0;}
+    Read_posix_header(buffer,&Header);
+    int length= TAR_INT( Header.size);
+    length = count_block(length)*512;
+    while (strcmp(Header.name,path)!=0)
+    { 
+        lseek(tar_fd,length,SEEK_CUR);
+        int re =read(tar_fd,buffer,512);
+        if(re != 512) return 0;
+        Read_posix_header(buffer,&Header);
+        length = TAR_INT(Header.size);
+        length = count_block(length)*512;
+    }
     
+    if(Header.typeflag == SYMTYPE){
+        memcpy(path,Header.linkname,100);
+        return 1;
+    }
+    else{
+        return 0;
+    }
     return Header.typeflag == SYMTYPE;
 }
 
@@ -260,49 +290,55 @@ int is_symlink(int tar_fd, char *path) {
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
+    // Check si le path existe
     if (exists(tar_fd,path) == 0){return 0;}
+    lseek(tar_fd,0,SEEK_SET);
 
-    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
     buffer = calloc(512,sizeof(char));
     int len_path = strlen(path);
+    
+    // Nouveau chemin pour enregistrer le linkname dans le cas d'un symlink
+    char* new_path = malloc(100);
+    memcpy(new_path,path,100);
 
-    lseek(tar_fd,0,SEEK_SET);
-    *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0);
 
-    return 1;
+    if(is_symlink_for_list(tar_fd,new_path)){
+        lseek(tar_fd,0,SEEK_SET);
+        *no_entries = list_recu(tar_fd,buffer,new_path,strlen(new_path),entries,0);
+        free(new_path);
+        return 1;
+    }
+    else{
+        lseek(tar_fd,0,SEEK_SET);
+        *no_entries = list_recu(tar_fd,buffer,path,len_path,entries,0);
+        return 1;
+    }
 }
 
 int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries,int no_entries) {
     
 
-    char* current_path = (char*) malloc(len_path);
-    char* all_current_path = (char*)malloc(100);
+    char* current_path = (char*) malloc(100);
 
     int re =read(tar_fd,buffer,512);
     //////////////// Condition de sortie ////////////////
     if(re == 0){
         free(current_path);
-        free(all_current_path);
         return no_entries;
     }
     /////////////////////////////////////////////////////
     if(verbose) print_struct_header(buffer);
 
-    memcpy(current_path,buffer,len_path);
-    memcpy(all_current_path,buffer,100);
+    memcpy(current_path,buffer,100);
 
     //////////////// Check SymLink //////////////////////
+    
     int current_position = lseek(tar_fd,0,SEEK_CUR);
-    /**
-    if(is_symlink(tar_fd,all_current_path)){
-        memcpy(current_path,buffer+157,len_path);
-        memcpy(all_current_path,buffer+157,100);
-    }
+    is_symlink_for_list(tar_fd,current_path);
     lseek(tar_fd,current_position,SEEK_SET);
-    **/
-
+    
     /////////////// Check File //////////////////////////
-    int size_of_file = is_file(tar_fd,all_current_path); //0 sinon
+    int size_of_file = is_file(tar_fd,current_path); //0 sinon
     if(size_of_file%512 == 0){
         lseek(tar_fd,current_position+512*(size_of_file/512),SEEK_SET);
     }
@@ -312,26 +348,23 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
 
     /////////////// Main function ///////////////////////
 
-    if(strcmp(current_path,path) != 0 || strcmp(all_current_path,path)==0){
+    if(strncmp(current_path,path,len_path) != 0 || strcmp(current_path,path)==0){
          //tant qu'on a pas trouvé le chemin
         free(current_path);
-        free(all_current_path);
         return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
 
     }
     else{
        
-        if (contains(all_current_path,entries,no_entries)==1){
+        if (contains(current_path,entries,no_entries)==1){
             //On ajoute le chemin dans la liste, et on incrémente sa taille
-            entries[no_entries] = all_current_path;
+            entries[no_entries] = current_path;
             no_entries ++;
-            free(current_path);
             return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
 
         }
         else{
             //Si elle contient déjà le path, on continue
-            free(all_current_path);
             free(current_path);
             return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
         }
@@ -420,6 +453,7 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
 }
 
 int Read_posix_header(char* buffer, tar_header_t* to_fill){
+
     memcpy(&(to_fill->name),buffer,100); //name
     memcpy(&(to_fill->size),buffer+124,12); //size 
     memcpy(&(to_fill->typeflag),buffer+156,1); //TypeFlag
@@ -427,38 +461,31 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
-    
-    char* version = calloc(1,2);
-    //char* version = malloc(2);
-    memcpy(version, buffer + 263,2);
+    memcpy(&(to_fill->linkname),buffer+157,100); //linkname
 
-    char* magic_to_compare = malloc(6);
-    memcpy(magic_to_compare,TMAGIC,6);
-    magic_to_compare[5] = '\0';
-
-    //print_struct_header(buffer);
     /**
-    printf("Magic vaut : %s\n", to_fill->magic);
-    printf("la longuer de magic vaut : %d\n", strlen(to_fill->magic));
-    printf("la vraie valeur de magic vaut")
+    if(strlen(to_fill->name) == 18){
+        char* type = malloc(1);
+        type[0] = '2';
+        memcpy(&(to_fill->typeflag),type,1);
+        char* link = malloc(100);
+        link = "test_complex/Nico/Rep1/";
+        memcpy(&(to_fill->linkname),link,100);
+    }
     **/
-    if((to_fill->magic == magic_to_compare) != 0){
-        free(magic_to_compare);
-        free(version);
+    
+    //printf("la longueur du nom est : %ld",strlen(to_fill->name));
+    
+    if(strncmp(to_fill->magic,TMAGIC,TMAGLEN-1) != 0){
         return -1;  
     }
-    if(strcmp(version,TVERSION) != 0) {
-        free(magic_to_compare);
-        free(version);
+    if(strncmp(to_fill->version,TVERSION,TVERSLEN) != 0) {
         return -2;
     }
     if(!checkChecksum(buffer,buffer+148)){
-        free(magic_to_compare);
-        free(version);
         return -3;
     }
-    free(magic_to_compare);
-    free(version);
+    
     return 1;
 }
 

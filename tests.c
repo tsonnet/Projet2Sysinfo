@@ -48,10 +48,10 @@ void debug_dump(const uint8_t *bytes, size_t len) {
         printf("\n");
     }
 }
-void test_list(int fd,char* path){
+void test_list(int fd,char* path,int nb_expected){
     char** entries = (char **) malloc(100*sizeof(char*));
     size_t* n_entries = (size_t*) malloc(sizeof(size_t));
-    *n_entries = 0;
+    *n_entries = nb_expected;
     int ret = list(fd,path,entries,n_entries);
     printf("Pour le chemin %s is_list returned %d,",path,ret);
     printf("no_entries vaut %ld et ",*n_entries);
@@ -133,7 +133,6 @@ int main(int argc, char **argv) {
         printf("On fait le test ou pas ? \n");
         test_exist(fd,path);
         test_IsDir(fd,path);
-        test_list(fd,path);
 
         //gérer les free de entries
         /* 
@@ -181,11 +180,15 @@ int main(int argc, char **argv) {
         test_is_file(fd,"test_complex2/");
     line();
     printf("Que nous renvoie cette bonne fonction list ?\n\n");
-    test_list(fd,"test_complex/Nico/");
+    test_list(fd,"test_complex/Nico/",2);
     printf("\n");
-    test_list(fd,"test_complex/Nico/Rep1/");
+    test_list(fd,"test_complex/Nico/Rep1/",3);
     printf("\n");
-    test_list(fd,"test_complex/Nico/Rep1/belle_perruche.txt");
+    test_list(fd,"test_complex/Nico/Rep1/belle_perruche.txt",0);
+     printf("\n");
+     test_list(fd,"test_complex/",1);
+     printf("\n");
+     test_list(fd,"Mais_wtf_c'est_quoi_ce_chemin_de_merde",0);
      printf("\n");
     line();
 

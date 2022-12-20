@@ -105,6 +105,8 @@ int is_file(int tar_fd, char *path);
  */
 int is_symlink(int tar_fd, char *path);
 
+int is_symlink_for_list(int tar_fd, char *path);
+
 
 /**
  * Lists the entries at a given path in the archive.
