@@ -51,9 +51,17 @@ int check_archive(int tar_fd) {
                 lseek(tar_fd,current_position+512*((size_of_file/512)+1),SEEK_SET);
             }
         }
+       
         ////////////////////////////////////////////////////////////////
+
+        /**
+        printf("la valeur de version vaut %s\n", structure->version);
+        printf("la taille de version devrait valoir 2 mais vaut %ld", strlen(structure->version));
+        printf("la vraie valeur de version vaut %s\n", TVERSION);
+        **/
+
         if(res < 0){
-            if(*structure->name == '\0'){
+            if(structure->name[0] == '\0'){
                 continue;
             }
             else{
@@ -204,41 +212,26 @@ int is_file(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_symlink(int tar_fd, char *path) {
-    if (exists(tar_fd,path) == 0){return 0;}///check si l'entrée existe, on peut donc ensuite considérer que notre boucle s'arretera quoi qu'il arrive
+    if (exists(tar_fd,path) == 0){return 0;}
 
+    lseek(tar_fd,0,SEEK_SET);
     buffer = calloc(512,sizeof(char));
-    lseek(tar_fd,0,SEEK_SET); // IMPORTANT remettre le fichier au début
+    tar_header_t  Header;
     int re =read(tar_fd,buffer,512);
-    int len_path = strlen(path);
-
-    if(re ==0) return 0;
-    counter = 0;
-
-    while(1){
-        char* current_path = (char*) malloc(len_path);
-        memcpy(current_path,buffer,len_path);
-        if(strcmp(path,current_path) == 0){
-            char* current_type_flag = (char*) malloc(1);
-            memcpy(current_type_flag,buffer+counter+156,1);
-            if(TAR_INT(current_type_flag)!=SYMTYPE){
-                free(current_type_flag);
-                free(current_path);
-                return 0;
-            }
-            else{
-                free(current_path);
-                free(current_type_flag);
-                return 1;
-            }
-        }
-        else{
-            free(current_path);
-            int re = read(tar_fd,buffer,512);
-            if(re ==0) return 0;
-        }
+    if(re == 0){return 0;}
+    Read_posix_header(buffer,&Header);
+    int length= TAR_INT( Header.size);
+    length = count_block(length)*512;
+    while (strcmp(Header.name,path)!=0)
+    { 
+        lseek(tar_fd,length,SEEK_CUR);
+        int re =read(tar_fd,buffer,512);
+        if(re != 512) return 0;
+        Read_posix_header(buffer,&Header);
+        length = TAR_INT(Header.size);
+        length = count_block(length)*512;
     }
-    
-    return 0;
+    return Header.typeflag==SYMTYPE;
 }
 
 
@@ -425,15 +418,39 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->name),buffer,100); //name
     memcpy(&(to_fill->size),buffer+124,12); //size 
     memcpy(&(to_fill->typeflag),buffer+156,1); //TypeFlag
-    memcpy(&(to_fill->magic),buffer+257,5);//value
+    memcpy(&(to_fill->magic),buffer+257,6);//value
     memcpy(&(to_fill->version),buffer+263,2); //Version 
     memcpy(&(to_fill->chksum),buffer+148,8); //chcksum
     memcpy(&(to_fill->uname),buffer+263,32); //uname
-   
+    
+    char* version = malloc(2);
+    memcpy(version, buffer + 263,2);
+
+    char* magic_to_compare = malloc(6);
+    memcpy(magic_to_compare,TMAGIC,6);
+    magic_to_compare[5] = '\0';
+
     if(verbose) print_struct_header(buffer);
-    if (strcmp(TMAGIC,to_fill->magic)!=0)return -1;  
-    //if(strcmp(TVERSION,to_fill->version)!=0) return -2;
-    if(!checkChecksum(buffer,buffer+148))return -3;
+    /**
+    printf("Magic vaut : %s\n", to_fill->magic);
+    printf("la longuer de magic vaut : %d\n", strlen(to_fill->magic));
+    printf("la vraie valeur de magic vaut")
+    **/
+    if((to_fill->magic == magic_to_compare) != 0){
+        free(magic_to_compare);
+        free(version);
+        return -1;  
+    }
+    if(strcmp(version,TVERSION) != 0) {
+        free(magic_to_compare);
+        free(version);
+        return -2;
+    }
+    if(!checkChecksum(buffer,buffer+148)){
+        free(magic_to_compare);
+        free(version);
+        return -3;
+    }
     return 1;
 }
 
