@@ -49,7 +49,7 @@ void debug_dump(const uint8_t *bytes, size_t len) {
     }
 }
 void test_list(int fd,char* path,int nb_expected){
-    char** entries = (char **) malloc(100*sizeof(char*));
+    char** entries = (char **) malloc(nb_expected*sizeof(char*));
     size_t* n_entries = (size_t*) malloc(sizeof(size_t));
     *n_entries = nb_expected;
     int ret = list(fd,path,entries,n_entries);
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
         First Test : with testThibaut.tar
         */
     }
-    fd =open("testThibaut.tar",O_RDONLY);
+    fd =open("TestThibaut2.tar",O_RDONLY);
 
     printf("Avant toute chose, est ce que l'achive est correcte ? Combien de fichiers et dossiers contient-elle ?\n\n");
     test_archive(fd);
@@ -181,6 +181,8 @@ int main(int argc, char **argv) {
     line();
     printf("Que nous renvoie cette bonne fonction list ?\n\n");
     test_list(fd,"test_complex/Nico/",2);
+    printf("\n");
+    test_list(fd,"test_complex/Rep1_symlink",3);
     printf("\n");
     test_list(fd,"test_complex/Nico/Rep1/",3);
     printf("\n");

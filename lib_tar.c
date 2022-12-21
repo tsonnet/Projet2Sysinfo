@@ -330,13 +330,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     if(verbose) print_struct_header(buffer);
 
     memcpy(current_path,buffer,100);
-
-    //////////////// Check SymLink //////////////////////
-    
     int current_position = lseek(tar_fd,0,SEEK_CUR);
-    is_symlink_for_list(tar_fd,current_path);
-    lseek(tar_fd,current_position,SEEK_SET);
-    
     /////////////// Check File //////////////////////////
     int size_of_file = is_file(tar_fd,current_path); //0 sinon
     if(size_of_file%512 == 0){
@@ -348,7 +342,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
 
     /////////////// Main function ///////////////////////
 
-    if(strncmp(current_path,path,len_path) != 0 || strcmp(current_path,path)==0){
+    if(strncmp(current_path,path,len_path) != 0 || strcmp(current_path,path)==0){ //on ne veut pas le path dans la liste, juste les sous-fichiers/dossiers
          //tant qu'on a pas trouvé le chemin
         free(current_path);
         return list_recu(tar_fd,buffer,path,len_path,entries,no_entries);
@@ -357,6 +351,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
     else{
        
         if (contains(current_path,entries,no_entries)==1){
+    
             //On ajoute le chemin dans la liste, et on incrémente sa taille
             entries[no_entries] = current_path;
             no_entries ++;
@@ -379,7 +374,7 @@ int contains(char* path, char **entries,int no_entries){
     else{
         for (size_t i = 0; i < no_entries; i++){
             char* path_to_compare = malloc(strlen(entries[i]));
-            memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dosiers, on se limite à la longeur des entrées
+            memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dossiers, on se limite à la longeur des entrées
             if(strcmp(path_to_compare,entries[i])==0){
                 return 0;
             }
@@ -416,8 +411,17 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     tar_header_t * Header = malloc(sizeof(tar_header_t));
     int re =read(tar_fd,buffer,512);
     Read_posix_header(buffer,Header);
+
+    ////////// Check Symlink ///////////////
+
+    char * new_path = malloc(100);
+    memcpy(new_path,path,100);
+    is_symlink_for_list(tar_fd,new_path);
+    lseek(tar_fd,0,SEEK_SET);
+
+    //////////////////////////////////////////
     while (re==512) {// Read until EOF
-        if (strcmp(Header->name, path) == 0) {
+        if (strcmp(Header->name, new_path) == 0) {
         found = 1;
         break;
         }
@@ -428,15 +432,18 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     }
 
     if (found==0) {// We didn't find (found==0)! 
+        free(new_path);
         return -1;
     }
     if (Header->typeflag != REGTYPE && Header->typeflag !=AREGTYPE) { //REGTYPE et AREGTYPE pour regular File
+        free(new_path);
         return -1;
     }
 
     length_file = TAR_INT(Header->size);// Octal to Int
 
     if (offset > length_file) {// IS the offSet bigger thant length file 
+        free(new_path);
         return -2;
     }
 
@@ -448,7 +455,11 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     *len  = read(tar_fd, dest, *len); // Read the file and set the IN-out arg
 
     int to_ret = length_file - offset - *len;
-    if(to_ret<0) return 0;
+    if(to_ret<0) {
+        free(new_path);
+        return 0;
+    }
+    free(new_path);
     return to_ret;
 }
 
@@ -463,7 +474,7 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->uname),buffer+263,32); //uname
     memcpy(&(to_fill->linkname),buffer+157,100); //linkname
 
-    /**
+
     if(strlen(to_fill->name) == 18){
         char* type = malloc(1);
         type[0] = '2';
@@ -472,7 +483,8 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
         link = "test_complex/Nico/Rep1/";
         memcpy(&(to_fill->linkname),link,100);
     }
-    **/
+
+    
     
     //printf("la longueur du nom est : %ld",strlen(to_fill->name));
     
