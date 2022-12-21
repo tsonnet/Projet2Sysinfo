@@ -66,10 +66,10 @@ void test_list(int fd,char* path,int nb_expected){
         printf("%s]\n",entries[(*n_entries)-1]);
     }
     for (size_t i = 0; i < *n_entries; i++){
-        free(entries[i]);
+        //free(entries[i]);
     }
-    free(entries);
-    free(n_entries);
+    //free(entries);
+    //free(n_entries);
     
 }
 
@@ -142,6 +142,7 @@ int main(int argc, char **argv) {
     }
     fd =open("TestThibaut2.tar",O_RDONLY);
 
+    
     printf("Avant toute chose, est ce que l'achive est correcte ? Combien de fichiers et dossiers contient-elle ?\n\n");
     test_archive(fd);
     printf("\n");
@@ -179,20 +180,23 @@ int main(int argc, char **argv) {
         test_is_file(fd,"test_complex/Nico/Rep1/");
         test_is_file(fd,"test_complex2/");
     line();
+    
     printf("Que nous renvoie cette bonne fonction list ?\n\n");
     test_list(fd,"test_complex/Nico/",2);
     printf("\n");
     test_list(fd,"test_complex/Rep1_symlink",3);
     printf("\n");
     test_list(fd,"test_complex/Nico/Rep1/",3);
+    
     printf("\n");
     test_list(fd,"test_complex/Nico/Rep1/belle_perruche.txt",0);
      printf("\n");
-     test_list(fd,"test_complex/",1);
+     test_list(fd,"test_complex/",4);
      printf("\n");
      test_list(fd,"Mais_wtf_c'est_quoi_ce_chemin_de_merde",0);
      printf("\n");
     line();
+    
 
     printf("Que nous renvoie cette bonne fonction ReadFile avec offSet ?\n\n");
         test_Read_file(fd,"test_complex/",10,10);
@@ -202,6 +206,7 @@ int main(int argc, char **argv) {
         test_Read_file(fd,"test_complex/Nico/Rep1/belle_perruche.txt",30,10);
         test_Read_file(fd,"test_complex/Nico/Rep1/belle_perruche.txt",15,10);//To read all the file
         test_Read_file(fd,"test_complex/Nico/Rep1/belle_perruche.txt",0,30);//To read all the file
+    
 
     return 0;
 }

@@ -256,6 +256,44 @@ int is_symlink_for_list(int tar_fd, char *path) {
     }
     
     if(Header.typeflag == SYMTYPE){
+        int mark = 0;
+        for (size_t i = 0; i < strlen(path); i++){
+            if (path[i] == '/'){
+                mark = i;
+            }
+        }
+        memcpy(path+mark+1,Header.linkname,100-mark-1);
+        return 1;
+    }
+    else{
+        return 0;
+    }
+    return Header.typeflag == SYMTYPE;
+}
+
+int is_symlink_for_list2(int tar_fd, char *path) {
+    if (exists(tar_fd,path) == 0){return 0;}
+
+    lseek(tar_fd,0,SEEK_SET);
+    buffer = calloc(512,sizeof(char));
+    tar_header_t  Header;
+    int re =read(tar_fd,buffer,512);
+    if(re == 0){return 0;}
+    Read_posix_header(buffer,&Header);
+    int length= TAR_INT( Header.size);
+    length = count_block(length)*512;
+    while (strcmp(Header.name,path)!=0)
+    { 
+        lseek(tar_fd,length,SEEK_CUR);
+        int re =read(tar_fd,buffer,512);
+        if(re != 512) return 0;
+        Read_posix_header(buffer,&Header);
+        length = TAR_INT(Header.size);
+        length = count_block(length)*512;
+    }
+    
+    if(Header.typeflag == SYMTYPE){
+    
         memcpy(path,Header.linkname,100);
         return 1;
     }
@@ -301,9 +339,9 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     char* new_path = malloc(100);
     memcpy(new_path,path,100);
 
-
     if(is_symlink_for_list(tar_fd,new_path)){
         lseek(tar_fd,0,SEEK_SET);
+        printf("LE  NOUVEAU CHEMIN VAUT : %s \n",new_path);
         *no_entries = list_recu(tar_fd,buffer,new_path,strlen(new_path),entries,0);
         free(new_path);
         return 1;
@@ -327,7 +365,7 @@ int list_recu(int tar_fd,char* buffer,char *path,size_t len_path, char **entries
         return no_entries;
     }
     /////////////////////////////////////////////////////
-    if(verbose) print_struct_header(buffer);
+    //print_struct_header(buffer);
 
     memcpy(current_path,buffer,100);
     int current_position = lseek(tar_fd,0,SEEK_CUR);
@@ -373,12 +411,10 @@ int contains(char* path, char **entries,int no_entries){
     }
     else{
         for (size_t i = 0; i < no_entries; i++){
-            char* path_to_compare = malloc(strlen(entries[i]));
-            memcpy(path_to_compare,path,strlen(entries[i])); //On ne veut pas les sous-dossiers, on se limite à la longeur des entrées
-            if(strcmp(path_to_compare,entries[i])==0){
+            size_t len_entry_i = strlen(entries[i]);
+            if(strncmp(path,entries[i],len_entry_i)==0){
                 return 0;
             }
-            free(path_to_compare);
         }
     }
     return 1;   
@@ -416,7 +452,7 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
 
     char * new_path = malloc(100);
     memcpy(new_path,path,100);
-    is_symlink_for_list(tar_fd,new_path);
+    is_symlink_for_list2(tar_fd,new_path);
     lseek(tar_fd,0,SEEK_SET);
 
     //////////////////////////////////////////
@@ -474,7 +510,7 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
     memcpy(&(to_fill->uname),buffer+263,32); //uname
     memcpy(&(to_fill->linkname),buffer+157,100); //linkname
 
-
+    /**
     if(strlen(to_fill->name) == 18){
         char* type = malloc(1);
         type[0] = '2';
@@ -483,6 +519,7 @@ int Read_posix_header(char* buffer, tar_header_t* to_fill){
         link = "test_complex/Nico/Rep1/";
         memcpy(&(to_fill->linkname),link,100);
     }
+    **/
 
     
     
